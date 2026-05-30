@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Vimeo Transcript</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Vimeo Transcript</h1>
+    </header>
+
+    <div id="status" class="status hidden"></div>
+
+    <div id="controls" class="hidden">
+      <div id="track-selector-row" class="hidden">
+        <label for="track-select">Язык:</label>
+        <select id="track-select"></select>
+      </div>
+
+      <div class="format-row">
+        <label class="radio-label">
+          <input type="radio" name="format" value="clean" checked> Чистый текст
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="format" value="timestamps"> С тайм-кодами
+        </label>
+      </div>
+
+      <div id="preview" class="preview"></div>
+
+      <div class="actions">
+        <button id="download-btn">Скачать .txt</button>
+      </div>
+    </div>
+
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <span>Загрузка транскрипта...</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
