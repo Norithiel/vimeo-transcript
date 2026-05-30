@@ -235,19 +235,8 @@ async function renderTranscript(data) {
 }
 
 async function init() {
-  const result = await chrome.storage.local.get("vimeoTranscript");
-  const data = result.vimeoTranscript;
-
-  if (!data) {
-    showStatus(
-      "Видео Vimeo не найдено.\n\n1. Убедитесь, что урок с видео открыт в браузере.\n2. Дождитесь полной загрузки плеера.\n3. Нажмите «Обновить».",
-      "info",
-      true
-    );
-    return;
-  }
-
-  await renderTranscript(data);
+  loadingEl.classList.remove("hidden");
+  await rejectScript();
 }
 
 // Auto-refresh when content script writes data while popup is open
