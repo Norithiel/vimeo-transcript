@@ -66,10 +66,12 @@ function toHHMMSS(sec) {
 function formatClean(segs) {
   let result = "";
   for (let i = 0; i < segs.length; i++) {
-    if (i > 0 && segs[i].startSec - segs[i - 1].startSec > 3) {
-      result += "\n\n";
-    } else if (i > 0) {
-      result += " ";
+    if (i > 0) {
+      const pause = segs[i].startSec - segs[i - 1].startSec;
+      const prevEndsWithStop = /[.!?…]\s*$/.test(segs[i - 1].text);
+      const isParagraphBreak =
+        pause > 12 || (pause > 5 && prevEndsWithStop);
+      result += isParagraphBreak ? "\n\n" : " ";
     }
     result += segs[i].text;
   }
