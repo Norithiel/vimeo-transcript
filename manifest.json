@@ -3,7 +3,7 @@
   "name": "Vimeo Transcript",
   "version": "1.0",
   "description": "Извлекает транскрипт из видео Vimeo и сохраняет как текстовый файл",
-  "permissions": ["storage"],
+  "permissions": ["storage", "scripting", "activeTab"],
   "host_permissions": [
     "*://player.vimeo.com/*",
     "*://captions.vimeo.com/*"

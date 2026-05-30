@@ -1,6 +1,8 @@
 "use strict";
 
 const statusEl = document.getElementById("status");
+const statusText = document.getElementById("status-text");
+const retryBtn = document.getElementById("retry-btn");
 const controlsEl = document.getElementById("controls");
 const loadingEl = document.getElementById("loading");
 const trackSelectorRow = document.getElementById("track-selector-row");
@@ -11,10 +13,12 @@ const downloadBtn = document.getElementById("download-btn");
 let segments = [];
 let videoTitle = "transcript";
 
-function showStatus(msg, type = "info") {
-  statusEl.textContent = msg;
+function showStatus(msg, type = "info", showRetry = false) {
+  statusText.textContent = msg;
   statusEl.className = `status ${type}`;
   statusEl.classList.remove("hidden");
+  retryBtn.classList.toggle("hidden", !showRetry);
+  controlsEl.classList.add("hidden");
 }
 
 function parseVtt(vttText) {
@@ -115,27 +119,40 @@ async function loadVtt(vttUrl) {
   }
 }
 
-async function init() {
-  const result = await chrome.storage.local.get("vimeoTranscript");
-  const data = result.vimeoTranscript;
+function rejectScript() {
+  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+    if (!tab) return;
+    chrome.scripting.executeScript(
+      { target: { tabId: tab.id, allFrames: true }, files: ["content.js"] },
+      () => {
+        if (chrome.runtime.lastError) {
+          showStatus(
+            "Не удалось подключиться к странице.\nУбедитесь что страница с видео открыта, затем обновите страницу (F5) и попробуйте снова.",
+            "error",
+            false
+          );
+        }
+      }
+    );
+  });
+}
 
-  if (!data) {
+async function renderTranscript(data) {
+  if (!data.tracks || !data.tracks.length) {
     showStatus(
-      "Видео Vimeo не найдено.\nОткройте страницу урока и дождитесь загрузки видео.",
-      "info"
+      "Субтитры для этого видео недоступны.\nВозможно, автор курса не добавил субтитры к этому уроку.",
+      "error",
+      false
     );
     return;
   }
 
-  if (!data.tracks || !data.tracks.length) {
-    showStatus("Субтитры для этого видео недоступны.", "error");
-    return;
-  }
-
   videoTitle = data.title || "transcript";
+  statusEl.classList.add("hidden");
 
   if (data.tracks.length > 1) {
     trackSelectorRow.classList.remove("hidden");
+    trackSelect.innerHTML = "";
     data.tracks.forEach((t) => {
       const opt = document.createElement("option");
       opt.value = t.url;
@@ -150,12 +167,19 @@ async function init() {
   try {
     segments = await loadVtt(getUrl());
   } catch (e) {
-    showStatus(`Ошибка загрузки транскрипта: ${e.message}`, "error");
+    const expired = e.message.includes("403") || e.message.includes("401");
+    showStatus(
+      expired
+        ? "Ссылка на субтитры устарела.\nПерезагрузите страницу с видео (F5) и нажмите «Обновить»."
+        : `Ошибка загрузки транскрипта: ${e.message}`,
+      "error",
+      expired
+    );
     return;
   }
 
   if (!segments.length) {
-    showStatus("Транскрипт пуст или не удалось распарсить.", "error");
+    showStatus("Транскрипт пуст или не удалось распарсить.", "error", false);
     return;
   }
 
@@ -171,11 +195,41 @@ async function init() {
       segments = await loadVtt(trackSelect.value);
       renderPreview();
     } catch (e) {
-      showStatus(`Ошибка: ${e.message}`, "error");
+      showStatus(`Ошибка: ${e.message}`, "error", true);
     }
   });
 
   downloadBtn.addEventListener("click", download);
 }
+
+async function init() {
+  const result = await chrome.storage.local.get("vimeoTranscript");
+  const data = result.vimeoTranscript;
+
+  if (!data) {
+    showStatus(
+      "Видео Vimeo не найдено.\n\n1. Убедитесь, что урок с видео открыт в браузере.\n2. Дождитесь полной загрузки плеера.\n3. Нажмите «Обновить».",
+      "info",
+      true
+    );
+    return;
+  }
+
+  await renderTranscript(data);
+}
+
+// Auto-refresh when content script writes data while popup is open
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.vimeoTranscript?.newValue) {
+    renderTranscript(changes.vimeoTranscript.newValue);
+  }
+});
+
+retryBtn.addEventListener("click", () => {
+  statusText.textContent =
+    "Подключаюсь к плееру...\nЕсли ничего не произошло — перезагрузите страницу с видео (F5).";
+  retryBtn.classList.add("hidden");
+  rejectScript();
+});
 
 init();
