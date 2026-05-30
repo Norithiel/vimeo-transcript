@@ -119,22 +119,53 @@ async function loadVtt(vttUrl) {
   }
 }
 
-function rejectScript() {
-  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-    if (!tab) return;
-    chrome.scripting.executeScript(
-      { target: { tabId: tab.id, allFrames: true }, files: ["content.js"] },
-      () => {
-        if (chrome.runtime.lastError) {
-          showStatus(
-            "Не удалось подключиться к странице.\nУбедитесь что страница с видео открыта, затем обновите страницу (F5) и попробуйте снова.",
-            "error",
-            false
-          );
-        }
-      }
+function readPlayerConfig() {
+  const cfg = window.playerConfig;
+  if (!cfg?.request?.text_tracks?.length) return null;
+  return {
+    videoId: cfg.video?.id,
+    title: cfg.video?.title || "transcript",
+    tracks: cfg.request.text_tracks.map((t) => ({
+      label: t.label,
+      url: t.url,
+      lang: t.lang,
+    })),
+    savedAt: Date.now(),
+  };
+}
+
+async function rejectScript() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab) {
+    showStatus("Не удалось получить активную вкладку.", "error", true);
+    return;
+  }
+  let results;
+  try {
+    results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true },
+      world: "MAIN",
+      func: readPlayerConfig,
+    });
+  } catch (e) {
+    showStatus(
+      "Не удалось подключиться к странице.\nУбедитесь что страница с видео открыта, затем обновите страницу (F5) и попробуйте снова.",
+      "error",
+      true
     );
-  });
+    return;
+  }
+  const data = results?.find((r) => r.result)?.result;
+  if (data) {
+    await chrome.storage.local.set({ vimeoTranscript: data });
+    await renderTranscript(data);
+  } else {
+    showStatus(
+      "Видео Vimeo не найдено на странице.\n\n1. Убедитесь, что урок с видео открыт.\n2. Дождитесь загрузки плеера.\n3. Нажмите «Обновить» снова.",
+      "info",
+      true
+    );
+  }
 }
 
 async function renderTranscript(data) {
@@ -225,11 +256,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
-retryBtn.addEventListener("click", () => {
-  statusText.textContent =
-    "Подключаюсь к плееру...\nЕсли ничего не произошло — перезагрузите страницу с видео (F5).";
+retryBtn.addEventListener("click", async () => {
+  statusText.textContent = "Подключаюсь к плееру...";
   retryBtn.classList.add("hidden");
-  rejectScript();
+  await rejectScript();
 });
 
 init();
