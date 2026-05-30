@@ -69,8 +69,7 @@ function formatClean(segs) {
     if (i > 0) {
       const pause = segs[i].startSec - segs[i - 1].startSec;
       const prevEndsWithStop = /[.!?…]\s*$/.test(segs[i - 1].text);
-      const isParagraphBreak =
-        pause > 12 || (pause > 5 && prevEndsWithStop);
+      const isParagraphBreak = pause >= 5 && prevEndsWithStop;
       result += isParagraphBreak ? "\n\n" : " ";
     }
     result += segs[i].text;
